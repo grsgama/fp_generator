@@ -1,0 +1,26 @@
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# SQLite databases (local MVP)
+*.db
+*.sqlite3
+
+# Logs and PIDs
+*.log
+streamlit.log
+*.pid
+
+# App configurations / local outputs
+outputs/
+.streamlit/
