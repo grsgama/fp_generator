@@ -25,15 +25,16 @@ def equipment_tab():
         c1, c2 = st.columns(2)
         name = c1.text_input("Nome do equipamento", placeholder="Ex.: Dicing saw")
         model = c2.text_input("Modelo", placeholder="Ex.: DAD3241")
-        c3, c4 = st.columns(2)
+        c3, c4, c5 = st.columns(3)
         manufacturer = c3.text_input("Fabricante", placeholder="Ex.: DISCO")
-        notes = c4.text_input("Observações")
+        category = c4.selectbox("Categoria", ["Fabricação", "Inspeção", "Metrologia", "Infraestrutura"])
+        notes = c5.text_input("Observações")
         submitted = st.form_submit_button("Salvar equipamento")
         if submitted:
             if not name.strip():
                 st.error("Nome do equipamento é obrigatório.")
             else:
-                db.add_equipment(name, model, manufacturer, notes)
+                db.add_equipment(name, model, manufacturer, category, notes)
                 st.success("Equipamento salvo.")
 
     rows = db.list_equipment()
@@ -42,8 +43,9 @@ def equipment_tab():
     else:
         st.write("### Cadastrados")
         for r in rows:
-            with st.expander(f"#{r['id']} - {r['name']} ({r['model'] or '-'})"):
+            with st.expander(f"#{r['id']} - [{r['category'] or '-'}] {r['name']} ({r['model'] or '-'})"):
                 st.write(f"Fabricante: {r['manufacturer'] or '-'}")
+                st.write(f"Categoria: {r['category'] or '-'}")
                 st.write(f"Notas: {r['notes'] or '-'}")
                 if st.button("Excluir", key=f"del_eq_{r['id']}"):
                     db.delete_equipment(r["id"])
@@ -146,17 +148,32 @@ def generate_tab():
         st.warning("Cadastre ao menos uma receita antes de gerar a planilha.")
         return
 
-    c1, c2 = st.columns(2)
+    c1, c2, c3 = st.columns(3)
     recipe_id = c1.selectbox(
         "Receita",
         options=[r["id"] for r in recipes],
         format_func=lambda rid: next(r["name"] for r in recipes if r["id"] == rid),
     )
+    categories = sorted({(e["category"] or "Sem categoria") for e in equipment})
+    selected_category = c2.selectbox(
+        "Categoria do equipamento",
+        options=["Todas"] + categories,
+    )
+    filtered_equipment = (
+        equipment
+        if selected_category == "Todas"
+        else [e for e in equipment if (e["category"] or "Sem categoria") == selected_category]
+    )
     equipment_id = c2.selectbox(
         "Equipamento",
-        options=[0] + [e["id"] for e in equipment],
-        format_func=lambda eid: "(nenhum)" if eid == 0 else next(e["name"] for e in equipment if e["id"] == eid),
+        options=[0] + [e["id"] for e in filtered_equipment],
+        format_func=lambda eid: "(nenhum)"
+        if eid == 0
+        else f"{next(e['name'] for e in filtered_equipment if e['id'] == eid)} [{next(e['category'] or '-' for e in filtered_equipment if e['id'] == eid)}]",
     )
+
+    # Keep layout balance; render an informational hint in the 3rd column.
+    c3.caption(f"Equipamentos visíveis: {len(filtered_equipment)}")
 
     template_path = st.text_input("Template XLSX", value=str(DEFAULT_TEMPLATE))
     filename = st.text_input("Nome do arquivo de saída", value=f"FP_gerada_{date.today().strftime('%Y%m%d')}.xlsx")
@@ -173,7 +190,10 @@ def generate_tab():
         # Enrich header with equipment info when selected.
         if equipment_id != 0:
             eq = next(e for e in equipment if e["id"] == equipment_id)
-            enrich = f"Equipamento: {eq['name']} | Modelo: {eq['model'] or '-'} | Fabricante: {eq['manufacturer'] or '-'}"
+            enrich = (
+                f"Equipamento: {eq['name']} | Modelo: {eq['model'] or '-'} | "
+                f"Fabricante: {eq['manufacturer'] or '-'} | Categoria: {eq['category'] or '-'}"
+            )
             base_desc = payload.get("brief_desc", "")
             payload["brief_desc"] = f"{base_desc} | {enrich}" if base_desc else enrich
 

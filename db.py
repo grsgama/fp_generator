@@ -19,6 +19,7 @@ def init_db():
                 name TEXT NOT NULL,
                 model TEXT,
                 manufacturer TEXT,
+                category TEXT DEFAULT 'Fabricação',
                 notes TEXT,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             );
@@ -42,20 +43,23 @@ def init_db():
             );
             """
         )
+        cols = [r["name"] for r in conn.execute("PRAGMA table_info(equipment)").fetchall()]
+        if "category" not in cols:
+            conn.execute("ALTER TABLE equipment ADD COLUMN category TEXT DEFAULT 'Fabricação'")
 
 
 def list_equipment():
     with get_conn() as conn:
         return conn.execute(
-            "SELECT id, name, model, manufacturer, notes, created_at FROM equipment ORDER BY id DESC"
+            "SELECT id, name, model, manufacturer, category, notes, created_at FROM equipment ORDER BY category, name, id"
         ).fetchall()
 
 
-def add_equipment(name, model, manufacturer, notes):
+def add_equipment(name, model, manufacturer, category, notes):
     with get_conn() as conn:
         conn.execute(
-            "INSERT INTO equipment(name, model, manufacturer, notes) VALUES(?, ?, ?, ?)",
-            (name.strip(), model.strip(), manufacturer.strip(), notes.strip()),
+            "INSERT INTO equipment(name, model, manufacturer, category, notes) VALUES(?, ?, ?, ?, ?)",
+            (name.strip(), model.strip(), manufacturer.strip(), category.strip(), notes.strip()),
         )
 
 
