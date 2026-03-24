@@ -40,3 +40,14 @@ Você pode apontar para outro template no campo `Template XLSX` da aba `Gerar pl
 
 ## Observação
 Se quiser acrescentar novos campos/células, edite o dicionário `CELL_MAP` em `xlsx_writer.py`.
+
+## Atalhos
+Iniciar app:
+```bash
+./start_fp_app.sh
+```
+
+Parar app:
+```bash
+./stop_fp_app.sh
+```
