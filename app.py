@@ -172,7 +172,6 @@ def generate_tab():
         else f"{next(e['name'] for e in filtered_equipment if e['id'] == eid)} [{next(e['category'] or '-' for e in filtered_equipment if e['id'] == eid)}]",
     )
 
-    # Keep layout balance; render an informational hint in the 3rd column.
     c3.caption(f"Equipamentos visíveis: {len(filtered_equipment)}")
 
     template_path = st.text_input("Template XLSX", value=str(DEFAULT_TEMPLATE))
@@ -187,7 +186,6 @@ def generate_tab():
         recipe = next(r for r in recipes if r["id"] == recipe_id)
         payload = json.loads(recipe["data_json"])
 
-        # Enrich header with equipment info when selected.
         if equipment_id != 0:
             eq = next(e for e in equipment if e["id"] == equipment_id)
             enrich = (

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="/home/grsgama/Nextcloud/LabNano/Folha de Processo/fp_generator"
+APP_DIR="/home/grsgama/Repositorio/fp_generator"
 PID_FILE="$APP_DIR/streamlit.pid"
 
 if [[ ! -f "$PID_FILE" ]]; then

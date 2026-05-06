@@ -51,7 +51,18 @@ def init_db():
 def list_equipment():
     with get_conn() as conn:
         return conn.execute(
-            "SELECT id, name, model, manufacturer, category, notes, created_at FROM equipment ORDER BY category, name, id"
+            """
+            SELECT id, name, model, manufacturer, category, notes, created_at
+            FROM equipment
+            ORDER BY
+              CASE category
+                WHEN 'Litografia' THEN 1
+                WHEN 'Deposição' THEN 2
+                WHEN 'Gravação' THEN 3
+                ELSE 99
+              END,
+              name, id
+            """
         ).fetchall()
 
 
@@ -66,6 +77,18 @@ def add_equipment(name, model, manufacturer, category, notes):
 def delete_equipment(equipment_id):
     with get_conn() as conn:
         conn.execute("DELETE FROM equipment WHERE id = ?", (equipment_id,))
+
+
+def update_equipment(equipment_id, name, model, manufacturer, category, notes):
+    with get_conn() as conn:
+        conn.execute(
+            """
+            UPDATE equipment
+            SET name = ?, model = ?, manufacturer = ?, category = ?, notes = ?
+            WHERE id = ?
+            """,
+            (name.strip(), model.strip(), manufacturer.strip(), category.strip(), notes.strip(), equipment_id),
+        )
 
 
 def list_recipes():
