@@ -2,13 +2,12 @@
 set -euo pipefail
 
 APP_DIR="/home/grsgama/Repositorio/fp_generator"
-STREAMLIT_BIN="/home/grsgama/miniconda3/envs/fp_generator/bin/streamlit"
-PID_FILE="$APP_DIR/streamlit.pid"
+PID_FILE="$APP_DIR/fp_generator.pid"
 UNIT_NAME="fp_generator"
 
 is_app_pid() {
   local pid="${1:-}"
-  [[ -n "$pid" ]] && ps -p "$pid" -o args= 2>/dev/null | grep -F "$STREAMLIT_BIN" | grep -F "app.py" >/dev/null
+  [[ -n "$pid" ]] && ps -p "$pid" -o args= 2>/dev/null | grep -F "uvicorn" | grep -F "app:app" >/dev/null
 }
 
 if command -v systemctl >/dev/null 2>&1 && systemctl --user --quiet is-active "$UNIT_NAME.service"; then
@@ -25,7 +24,7 @@ fi
 
 PID="$(cat "$PID_FILE" 2>/dev/null || true)"
 if [[ -z "${PID:-}" ]]; then
-  echo "PID inválido."
+  echo "PID invalido."
   rm -f "$PID_FILE"
   exit 0
 fi
@@ -38,7 +37,7 @@ if is_app_pid "$PID"; then
   fi
   echo "App finalizado (PID $PID)."
 else
-  echo "PID $PID não corresponde ao app."
+  echo "PID $PID nao corresponde ao app."
 fi
 
 rm -f "$PID_FILE"

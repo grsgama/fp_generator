@@ -1,29 +1,40 @@
-# Gerador de Folha de Processo (MVP)
+# FP Generator
 
-## O que este MVP faz
-- Cadastro de equipamentos (SQLite)
-- Montagem de folhas de processo a partir de blocos reutilizáveis
-- Blocos simples, como `Substrato`, `Limpeza química`, `Deposição` e `Lift-off`
-- Blocos compostos, como `Litografia óptica`, que expande para promotor, resiste, exposição, revelação e inspeção
-- Cadastro de composições salvas como receitas reutilizáveis (SQLite)
-- Geração automática de planilha `.xlsx` a partir de um template formatado
-- Numeração simples ou hierárquica dos blocos na folha gerada
-- Preserva a formatação porque só escreve o conteúdo nas células/linhas mapeadas
-- Histórico de arquivos gerados
+MVP local para cadastrar equipamentos, registrar blocos de receita e montar folhas de processo em uma interface web.
+
+## Arquitetura
+
+- `FastAPI`: API e servidor da interface web
+- `SQLite`: banco local em `fp_data.db`
+- `HTML/CSS/JS`: frontend simples em `static/`
+- `openpyxl`: geração de planilhas `.xlsx` a partir do template existente
+
+## Fluxo do MVP
+
+1. O master cadastra equipamentos.
+2. Usuarios cadastram blocos de receita usando equipamentos existentes.
+3. Uma folha de processo e montada como uma sequencia desses blocos.
+4. O sistema gera um XLSX e salva o historico.
+
+## Categorias iniciais
+
+- Litografia: Optica, Feixe de eletrons
+- Deposicao: Sputtering, Evaporacao
+- Ataque: Umido, RIE, DRIE, Ion Milling
+- Inspecao: MEV, TEM, Microscopio optico, Probe Station
+- Preparacao: FIB, Wire Bonder
 
 ## Estrutura
-- `app.py`: interface Streamlit
-- `db.py`: banco SQLite e CRUD básico
-- `xlsx_writer.py`: escrita de dados no template
-- `fp_data.db`: banco criado automaticamente
-- `outputs/`: planilhas geradas
 
-## Requisitos
-- Python 3.10+
-- Dependências em `requirements.txt`
+- `app.py`: API FastAPI e rotas de download
+- `db.py`: schema SQLite e funcoes de persistencia
+- `xlsx_writer.py`: escrita no template XLSX
+- `static/index.html`: interface visual
+- `static/styles.css`: estilos
+- `static/app.js`: logica do frontend
+- `outputs/`: arquivos XLSX gerados
 
-## Instalação
-No diretório deste projeto:
+## Instalar
 
 ```bash
 python3 -m venv .venv
@@ -32,63 +43,34 @@ pip install -r requirements.txt
 ```
 
 ## Executar
+
 ```bash
 ./start_fp_app.sh
 ```
 
-O app abre em `http://localhost:8511`.
+URL local:
 
-## Template
-Por padrão, o app usa:
-`../FP_FolhaDeProcesso_Modelo_EmBranco.xlsx`
-
-Você pode apontar para outro template no campo `Template XLSX` da aba `Gerar planilha`.
-
-## Fluxo de uso
-1. Abra a aba `Gerar planilha`.
-2. Escolha um `Processo base`, como `Lift-off`, ou comece em branco.
-3. Adicione blocos da biblioteca quando precisar.
-4. Edite a sequência de linhas da FP.
-5. Salve a composição se quiser reutilizá-la.
-6. Gere a planilha `.xlsx`.
-
-O processo base `Lift-off` monta automaticamente:
-- `1` Substrato
-- `2` Limpeza química
-- `3.1` Litografia óptica / Promotor de adesão
-- `3.2` Litografia óptica / Aplicação de resiste
-- `3.3` Litografia óptica / Exposição
-- `3.4` Litografia óptica / Revelação
-- `3.5` Litografia óptica / Inspeção pós-litografia
-- `4` Deposição
-- `5` Lift-off
-
-## Estrutura dos blocos
-Cada linha/bloco tem:
-- `ordem`
-- `numero`
-- `titulo`
-- `visao_geral`
-- `detalhes`
-- `notas`
-
-Na geração da planilha, o software escreve a sequência nas colunas:
-- `Nº`
-- `Passo do processo`
-- `Visão geral do processo`
-- `Detalhes do processo`
-- `Notas/Comentários`
-
-## Observação
-Se quiser ajustar as células do cabeçalho ou as colunas usadas pelos blocos, edite os mapeamentos em `xlsx_writer.py`.
-
-## Atalhos
-Iniciar app:
-```bash
-./start_fp_app.sh
+```text
+http://localhost:8511
 ```
 
-Parar app:
+Para acessar de outro computador na mesma rede, use o IP deste PC:
+
+```text
+http://IP_DO_PC:8511
+```
+
+## Parar
+
 ```bash
 ./stop_fp_app.sh
 ```
+
+## Template XLSX
+
+O app procura o template nestes caminhos:
+
+1. `../FP_FolhaDeProcesso_Modelo_EmBranco.xlsx`
+2. `/home/grsgama/Nextcloud/LabNano/Folha de Processo/FP_FolhaDeProcesso_Modelo_EmBranco.xlsx`
+
+Se o template nao for encontrado, o cadastro funciona, mas a geracao de XLSX falha ate o arquivo existir.

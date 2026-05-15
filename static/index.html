@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FP Generator</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <h1>FP Generator</h1>
+        <p>Biblioteca de processos e montagem de folhas de processo</p>
+      </div>
+      <div id="templateStatus" class="status-pill">Carregando</div>
+    </header>
+
+    <nav class="tabs" aria-label="Navegacao principal">
+      <button class="tab active" data-view="equipmentView">Equipamentos</button>
+      <button class="tab" data-view="recipesView">Blocos de receita</button>
+      <button class="tab" data-view="sheetsView">Folhas de processo</button>
+      <button class="tab" data-view="historyView">Historico</button>
+    </nav>
+
+    <main>
+      <section id="equipmentView" class="view active">
+        <div class="section-grid">
+          <form id="equipmentForm" class="panel">
+            <h2>Equipamento</h2>
+            <input type="hidden" name="id" />
+            <label>Nome <input name="name" required placeholder="DWL 66+" /></label>
+            <div class="two-cols">
+              <label>Categoria <select name="category" required></select></label>
+              <label>Subtipo <select name="subtype" required></select></label>
+            </div>
+            <div class="two-cols">
+              <label>Modelo <input name="model" placeholder="Modelo" /></label>
+              <label>Fabricante <input name="manufacturer" placeholder="Fabricante" /></label>
+            </div>
+            <div class="two-cols">
+              <label>Local <input name="location" placeholder="LabNano" /></label>
+              <label>Status
+                <select name="status">
+                  <option value="active">Ativo</option>
+                  <option value="inactive">Inativo</option>
+                </select>
+              </label>
+            </div>
+            <label>Observacoes <textarea name="notes" rows="3"></textarea></label>
+            <div class="actions">
+              <button type="submit">Salvar</button>
+              <button type="button" data-reset="equipmentForm">Limpar</button>
+            </div>
+          </form>
+
+          <section class="panel wide">
+            <h2>Equipamentos cadastrados</h2>
+            <div id="equipmentList" class="list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="recipesView" class="view">
+        <div class="section-grid">
+          <form id="recipeForm" class="panel">
+            <h2>Bloco de receita</h2>
+            <input type="hidden" name="id" />
+            <label>Nome <input name="name" required placeholder="Litografia AR-P 3740" /></label>
+            <div class="two-cols">
+              <label>Categoria <select name="category" required></select></label>
+              <label>Subtipo <select name="subtype" required></select></label>
+            </div>
+            <label>Equipamento <select name="equipment_id" required></select></label>
+            <div class="two-cols">
+              <label>Autor <input name="author" placeholder="Responsavel" /></label>
+              <label>Confianca
+                <select name="confidence_level">
+                  <option value="experimental">Experimental</option>
+                  <option value="provisoria">Provisoria</option>
+                  <option value="validada">Validada</option>
+                  <option value="rotina">Rotina</option>
+                </select>
+              </label>
+            </div>
+            <label>Descricao <textarea name="description" rows="3"></textarea></label>
+            <label>Notas <textarea name="notes" rows="3"></textarea></label>
+
+            <div class="form-row-header">
+              <h3>Parametros</h3>
+              <button type="button" id="addRecipeParam">Adicionar parametro</button>
+            </div>
+            <div id="recipeParams" class="params"></div>
+
+            <div class="actions">
+              <button type="submit">Salvar bloco</button>
+              <button type="button" data-reset="recipeForm">Limpar</button>
+            </div>
+          </form>
+
+          <section class="panel wide">
+            <h2>Blocos cadastrados</h2>
+            <div id="recipeList" class="list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="sheetsView" class="view">
+        <div class="section-grid">
+          <form id="sheetForm" class="panel">
+            <h2>Folha de processo</h2>
+            <input type="hidden" name="id" />
+            <label>Titulo <input name="title" required placeholder="Lift-off Au em Si" /></label>
+            <div class="two-cols">
+              <label>Autor <input name="author" /></label>
+              <label>Projeto <input name="project_name" /></label>
+            </div>
+            <label>Supervisor <input name="supervisor" /></label>
+            <label>Descricao <textarea name="description" rows="3"></textarea></label>
+
+            <div class="form-row-header">
+              <h3>Sequencia de blocos</h3>
+              <button type="button" id="addSheetBlock">Adicionar bloco</button>
+            </div>
+            <div id="sheetBlocks" class="params"></div>
+
+            <div class="actions">
+              <button type="submit">Salvar folha</button>
+              <button type="button" data-reset="sheetForm">Limpar</button>
+            </div>
+          </form>
+
+          <section class="panel wide">
+            <h2>Folhas salvas</h2>
+            <div id="sheetList" class="list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="historyView" class="view">
+        <section class="panel">
+          <h2>Arquivos gerados</h2>
+          <div id="historyList" class="list"></div>
+        </section>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status"></div>
+    <script src="/app.js"></script>
+  </body>
+</html>
