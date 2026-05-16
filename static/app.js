@@ -155,6 +155,7 @@ function renderRecipes() {
         </div>
         <div class="item-actions">
           <button class="secondary" data-edit-recipe="${item.id}">Editar</button>
+          <button class="secondary" data-duplicate-recipe="${item.id}">Duplicar</button>
           <button class="danger" data-delete-recipe="${item.id}">Remover</button>
         </div>
       </div>
@@ -365,6 +366,7 @@ function bindEvents() {
     if (target.matches("[data-edit-equipment]")) editEquipment(Number(target.dataset.editEquipment));
     if (target.matches("[data-edit-recipe]")) editRecipe(Number(target.dataset.editRecipe));
     if (target.matches("[data-edit-sheet]")) editSheet(Number(target.dataset.editSheet));
+    if (target.matches("[data-duplicate-recipe]")) await duplicateRecipe(Number(target.dataset.duplicateRecipe));
     if (target.matches("[data-delete-equipment]")) await removeItem(`/api/equipment/${target.dataset.deleteEquipment}`);
     if (target.matches("[data-delete-recipe]")) await removeItem(`/api/recipe-blocks/${target.dataset.deleteRecipe}`);
     if (target.matches("[data-delete-sheet]")) await removeItem(`/api/process-sheets/${target.dataset.deleteSheet}`);
@@ -423,6 +425,12 @@ async function saveRecipe(event) {
   resetForm("recipeForm");
   await refreshData();
   toast("Bloco salvo");
+}
+
+async function duplicateRecipe(id) {
+  await api(`/api/recipe-blocks/${id}/duplicate`, { method: "POST" });
+  await refreshData();
+  toast("Bloco duplicado");
 }
 
 async function saveSheet(event) {

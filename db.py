@@ -335,6 +335,31 @@ def update_recipe_block(recipe_block_id: int, data: dict[str, Any]) -> dict[str,
     return get_recipe_block(recipe_block_id)
 
 
+def duplicate_recipe_block(recipe_block_id: int) -> dict[str, Any] | None:
+    source = get_recipe_block(recipe_block_id)
+    if not source:
+        return None
+    payload = {
+        "name": f"{source['name']} - 1",
+        "category": source["category"],
+        "subtype": source["subtype"],
+        "equipment_id": source["equipment_id"],
+        "author": source.get("author") or "",
+        "confidence_level": source.get("confidence_level") or "experimental",
+        "description": source.get("description") or "",
+        "notes": source.get("notes") or "",
+        "parameters": [
+            {
+                "name": param.get("name") or "",
+                "value": param.get("value") or "",
+                "unit": param.get("unit") or "",
+            }
+            for param in source.get("parameters", [])
+        ],
+    }
+    return create_recipe_block(payload)
+
+
 def _replace_recipe_parameters(
     conn: sqlite3.Connection, recipe_block_id: int, parameters: list[dict[str, Any]]
 ) -> None:

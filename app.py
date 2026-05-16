@@ -152,6 +152,14 @@ def delete_recipe_block(recipe_block_id: int) -> dict[str, Any]:
     return {"removed": removed}
 
 
+@app.post("/api/recipe-blocks/{recipe_block_id}/duplicate")
+def duplicate_recipe_block(recipe_block_id: int) -> dict[str, Any]:
+    duplicated = db.duplicate_recipe_block(recipe_block_id)
+    if not duplicated:
+        raise HTTPException(status_code=404, detail="Recipe block not found")
+    return duplicated
+
+
 @app.get("/api/process-sheets")
 def list_process_sheets() -> list[dict[str, Any]]:
     return db.list_process_sheets()
