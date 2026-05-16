@@ -91,6 +91,7 @@ function resetForm(formId) {
   if (formId === "sheetForm") {
     $("#sheetBlocks").innerHTML = "";
     addSheetBlockRow();
+    updateSheetBlockOrder();
   }
 }
 
@@ -237,15 +238,50 @@ function addRecipeParamRow(param = {}) {
 function addSheetBlockRow(block = {}) {
   const row = document.createElement("div");
   row.className = "sheet-block-row";
+  row.draggable = true;
   row.innerHTML = `
-    <input data-sheet-block="seq" type="number" min="1" placeholder="Ordem" value="${block.seq || ""}" />
+    <span class="drag-handle" title="Arrastar para reordenar">↕</span>
+    <input data-sheet-block="seq" type="number" min="1" placeholder="Ordem" value="${block.seq || ""}" readonly />
     <select data-sheet-block="recipe_block_id"></select>
     <input data-sheet-block="title_override" placeholder="Titulo opcional" value="${block.title_override || ""}" />
     <input data-sheet-block="notes_override" placeholder="Nota opcional" value="${block.notes_override || ""}" />
     <button type="button" class="danger icon-button" data-remove-row>×</button>
   `;
   fillRecipeSelect($("select", row), block.recipe_block_id || "");
+  bindSheetBlockDrag(row);
   $("#sheetBlocks").append(row);
+  updateSheetBlockOrder();
+}
+
+function updateSheetBlockOrder() {
+  $$("#sheetBlocks .sheet-block-row").forEach((row, index) => {
+    $("[data-sheet-block='seq']", row).value = index + 1;
+  });
+}
+
+function bindSheetBlockDrag(row) {
+  row.addEventListener("dragstart", () => {
+    row.classList.add("dragging");
+  });
+  row.addEventListener("dragend", () => {
+    row.classList.remove("dragging");
+    updateSheetBlockOrder();
+  });
+}
+
+function getDragAfterElement(container, y) {
+  const rows = [...container.querySelectorAll(".sheet-block-row:not(.dragging)")];
+  return rows.reduce(
+    (closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset, element: child };
+      }
+      return closest;
+    },
+    { offset: Number.NEGATIVE_INFINITY, element: null }
+  ).element;
 }
 
 function recipeParamsPayload() {
@@ -322,7 +358,10 @@ function bindEvents() {
 
   document.addEventListener("click", async (event) => {
     const target = event.target;
-    if (target.matches("[data-remove-row]")) target.closest(".param-row, .sheet-block-row").remove();
+    if (target.matches("[data-remove-row]")) {
+      target.closest(".param-row, .sheet-block-row").remove();
+      updateSheetBlockOrder();
+    }
     if (target.matches("[data-edit-equipment]")) editEquipment(Number(target.dataset.editEquipment));
     if (target.matches("[data-edit-recipe]")) editRecipe(Number(target.dataset.editRecipe));
     if (target.matches("[data-edit-sheet]")) editSheet(Number(target.dataset.editSheet));
@@ -335,6 +374,18 @@ function bindEvents() {
   $("#equipmentForm").addEventListener("submit", saveEquipment);
   $("#recipeForm").addEventListener("submit", saveRecipe);
   $("#sheetForm").addEventListener("submit", saveSheet);
+  $("#sheetBlocks").addEventListener("dragover", (event) => {
+    event.preventDefault();
+    const dragging = $(".sheet-block-row.dragging");
+    if (!dragging) return;
+    const afterElement = getDragAfterElement($("#sheetBlocks"), event.clientY);
+    if (afterElement == null) {
+      $("#sheetBlocks").appendChild(dragging);
+    } else {
+      $("#sheetBlocks").insertBefore(dragging, afterElement);
+    }
+    updateSheetBlockOrder();
+  });
 }
 
 async function removeItem(path) {
@@ -425,6 +476,7 @@ function editSheet(id) {
   $("#sheetBlocks").innerHTML = "";
   item.blocks.forEach((block) => addSheetBlockRow(block));
   if (!item.blocks.length) addSheetBlockRow();
+  updateSheetBlockOrder();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -438,4 +490,5 @@ async function generateSheet(id) {
 bindEvents();
 addRecipeParamRow();
 addSheetBlockRow();
+updateSheetBlockOrder();
 loadAll().catch((error) => toast(error.message));

@@ -148,6 +148,10 @@ main {
   align-items: start;
 }
 
+.sheets-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -211,6 +215,10 @@ textarea:focus {
   justify-content: space-between;
 }
 
+.sheet-actions {
+  margin-top: 10px;
+}
+
 .form-row-header {
   margin: 14px 0 10px;
 }
@@ -268,11 +276,28 @@ textarea:focus {
 }
 
 .sheet-block-row {
-  grid-template-columns: 70px minmax(180px, 1fr) minmax(120px, 1fr) minmax(120px, 1fr) 36px;
+  grid-template-columns: 28px 58px minmax(260px, 1.8fr) minmax(130px, 0.8fr) minmax(130px, 0.8fr) 28px;
+}
+
+.drag-handle {
+  display: grid;
+  place-items: center;
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #f8fafc;
+  color: var(--muted);
+  cursor: grab;
+  user-select: none;
+}
+
+.sheet-block-row.dragging {
+  opacity: 0.45;
 }
 
 .icon-button {
-  min-height: 36px;
+  min-height: 28px;
+  width: 28px;
   padding: 0;
 }
 
