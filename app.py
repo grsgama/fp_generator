@@ -86,6 +86,8 @@ def startup() -> None:
 def meta() -> dict[str, Any]:
     return {
         "categories": db.list_categories(),
+        "sheet_statuses": ["draft", "review", "approved", "obsolete"],
+        "recipe_statuses": ["experimental", "provisoria", "validada", "rotina", "obsoleta"],
         "default_template": str(DEFAULT_TEMPLATE),
         "template_exists": DEFAULT_TEMPLATE.exists(),
     }
@@ -138,7 +140,10 @@ def update_recipe_block(recipe_block_id: int, payload: RecipeBlockIn) -> dict[st
         raise HTTPException(status_code=404, detail="Recipe block not found")
     if not db.get_equipment(payload.equipment_id):
         raise HTTPException(status_code=400, detail="Equipment does not exist")
-    updated = db.update_recipe_block(recipe_block_id, model_data(payload))
+    try:
+        updated = db.update_recipe_block(recipe_block_id, model_data(payload))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     return updated or {}
 
 
@@ -174,7 +179,10 @@ def create_process_sheet(payload: ProcessSheetIn) -> dict[str, Any]:
 def update_process_sheet(process_sheet_id: int, payload: ProcessSheetIn) -> dict[str, Any]:
     if not db.get_process_sheet(process_sheet_id):
         raise HTTPException(status_code=404, detail="Process sheet not found")
-    updated = db.update_process_sheet(process_sheet_id, model_data(payload))
+    try:
+        updated = db.update_process_sheet(process_sheet_id, model_data(payload))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     return updated or {}
 
 
@@ -182,7 +190,10 @@ def update_process_sheet(process_sheet_id: int, payload: ProcessSheetIn) -> dict
 def delete_process_sheet(process_sheet_id: int) -> dict[str, Any]:
     if not db.get_process_sheet(process_sheet_id):
         raise HTTPException(status_code=404, detail="Process sheet not found")
-    db.delete_process_sheet(process_sheet_id)
+    try:
+        db.delete_process_sheet(process_sheet_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"removed": True}
 
 
@@ -207,6 +218,25 @@ def generate_process_sheet(process_sheet_id: int) -> dict[str, Any]:
 @app.get("/api/generated")
 def list_generated() -> list[dict[str, Any]]:
     return db.list_generated()
+
+
+@app.get("/api/audit")
+def list_audit(limit: int = 100) -> list[dict[str, Any]]:
+    return db.list_audit_log(limit=limit)
+
+
+@app.get("/api/recipe-blocks/{recipe_block_id}/revisions")
+def list_recipe_block_revisions(recipe_block_id: int) -> list[dict[str, Any]]:
+    if not db.get_recipe_block(recipe_block_id):
+        raise HTTPException(status_code=404, detail="Recipe block not found")
+    return db.list_recipe_block_revisions(recipe_block_id)
+
+
+@app.get("/api/process-sheets/{process_sheet_id}/revisions")
+def list_process_sheet_revisions(process_sheet_id: int) -> list[dict[str, Any]]:
+    if not db.get_process_sheet(process_sheet_id):
+        raise HTTPException(status_code=404, detail="Process sheet not found")
+    return db.list_process_sheet_revisions(process_sheet_id)
 
 
 @app.get("/download/{generated_id}")

@@ -4,6 +4,9 @@ const state = {
   recipes: [],
   sheets: [],
   generated: [],
+  audit: [],
+  recipeRevisions: [],
+  sheetRevisions: [],
 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -224,6 +227,88 @@ function renderHistory() {
   });
 }
 
+function renderAudit() {
+  const list = $("#auditList");
+  list.innerHTML = "";
+  if (!state.audit.length) {
+    list.innerHTML = "<p class='muted'>Nenhum evento de auditoria.</p>";
+    return;
+  }
+  state.audit.forEach((item) => {
+    const node = document.createElement("article");
+    node.className = "item";
+    node.innerHTML = `
+      <div class="item-header">
+        <div>
+          <div class="item-title">${item.entity_type} #${item.entity_id ?? "-"}</div>
+          <div class="muted">${item.action} | ${item.created_at}</div>
+          <div class="muted">${item.payload || "-"}</div>
+        </div>
+      </div>
+    `;
+    list.append(node);
+  });
+}
+
+function renderRevisions() {
+  const recipeList = $("#recipeRevisionList");
+  const sheetList = $("#sheetRevisionList");
+  recipeList.innerHTML = "";
+  sheetList.innerHTML = "";
+
+  const recipeRows = state.recipeRevisions.slice(0, 10);
+  const sheetRows = state.sheetRevisions.slice(0, 10);
+
+  if (!recipeRows.length) {
+    recipeList.innerHTML = "<p class='muted'>Sem revisoes de blocos.</p>";
+  } else {
+    recipeRows.forEach((item) => {
+      const node = document.createElement("article");
+      node.className = "item";
+      node.innerHTML = `
+        <div class="item-header">
+          <div>
+            <div class="item-title">Bloco #${item.recipe_block_id} v${item.revision_no}</div>
+            <div class="muted">${item.action} | ${item.created_at}</div>
+            <div class="muted">${item.payload}</div>
+          </div>
+        </div>
+      `;
+      recipeList.append(node);
+    });
+  }
+
+  if (!sheetRows.length) {
+    sheetList.innerHTML = "<p class='muted'>Sem revisoes de folhas.</p>";
+  } else {
+    sheetRows.forEach((item) => {
+      const node = document.createElement("article");
+      node.className = "item";
+      node.innerHTML = `
+        <div class="item-header">
+          <div>
+            <div class="item-title">Folha #${item.process_sheet_id} v${item.revision_no}</div>
+            <div class="muted">${item.action} | ${item.created_at}</div>
+            <div class="muted">${item.payload}</div>
+          </div>
+        </div>
+      `;
+      sheetList.append(node);
+    });
+  }
+}
+
+async function loadLatestRevisions() {
+  state.recipeRevisions = [];
+  state.sheetRevisions = [];
+  if (state.recipes.length) {
+    state.recipeRevisions = await api(`/api/recipe-blocks/${state.recipes[0].id}/revisions`).catch(() => []);
+  }
+  if (state.sheets.length) {
+    state.sheetRevisions = await api(`/api/process-sheets/${state.sheets[0].id}/revisions`).catch(() => []);
+  }
+}
+
 function addRecipeParamRow(param = {}) {
   const row = document.createElement("div");
   row.className = "param-row";
@@ -317,11 +402,15 @@ async function loadAll() {
   state.recipes = await api("/api/recipe-blocks");
   state.sheets = await api("/api/process-sheets");
   state.generated = await api("/api/generated");
+  state.audit = await api("/api/audit?limit=50");
+  await loadLatestRevisions();
   $$("#sheetBlocks select").forEach((select) => fillRecipeSelect(select));
   renderEquipment();
   renderRecipes();
   renderSheets();
   renderHistory();
+  renderAudit();
+  renderRevisions();
 }
 
 async function refreshData() {
@@ -329,11 +418,15 @@ async function refreshData() {
   state.recipes = await api("/api/recipe-blocks");
   state.sheets = await api("/api/process-sheets");
   state.generated = await api("/api/generated");
+  state.audit = await api("/api/audit?limit=50");
+  await loadLatestRevisions();
   $$("#sheetBlocks select").forEach((select) => fillRecipeSelect(select, select.value));
   renderEquipment();
   renderRecipes();
   renderSheets();
   renderHistory();
+  renderAudit();
+  renderRevisions();
 }
 
 function bindEvents() {
@@ -392,9 +485,13 @@ function bindEvents() {
 
 async function removeItem(path) {
   if (!confirm("Confirmar remocao?")) return;
-  await api(path, { method: "DELETE" });
-  await refreshData();
-  toast("Registro removido");
+  try {
+    await api(path, { method: "DELETE" });
+    await refreshData();
+    toast("Registro removido");
+  } catch (error) {
+    toast(error.message);
+  }
 }
 
 async function saveEquipment(event) {
@@ -402,13 +499,17 @@ async function saveEquipment(event) {
   const data = formData(event.currentTarget);
   const id = data.id;
   delete data.id;
-  await api(id ? `/api/equipment/${id}` : "/api/equipment", {
-    method: id ? "PUT" : "POST",
-    body: JSON.stringify(data),
-  });
-  resetForm("equipmentForm");
-  await refreshData();
-  toast("Equipamento salvo");
+  try {
+    await api(id ? `/api/equipment/${id}` : "/api/equipment", {
+      method: id ? "PUT" : "POST",
+      body: JSON.stringify(data),
+    });
+    resetForm("equipmentForm");
+    await refreshData();
+    toast("Equipamento salvo");
+  } catch (error) {
+    toast(error.message);
+  }
 }
 
 async function saveRecipe(event) {
@@ -418,19 +519,27 @@ async function saveRecipe(event) {
   delete data.id;
   data.equipment_id = Number(data.equipment_id);
   data.parameters = recipeParamsPayload();
-  await api(id ? `/api/recipe-blocks/${id}` : "/api/recipe-blocks", {
-    method: id ? "PUT" : "POST",
-    body: JSON.stringify(data),
-  });
-  resetForm("recipeForm");
-  await refreshData();
-  toast("Bloco salvo");
+  try {
+    await api(id ? `/api/recipe-blocks/${id}` : "/api/recipe-blocks", {
+      method: id ? "PUT" : "POST",
+      body: JSON.stringify(data),
+    });
+    resetForm("recipeForm");
+    await refreshData();
+    toast("Bloco salvo");
+  } catch (error) {
+    toast(error.message);
+  }
 }
 
 async function duplicateRecipe(id) {
-  await api(`/api/recipe-blocks/${id}/duplicate`, { method: "POST" });
-  await refreshData();
-  toast("Bloco duplicado");
+  try {
+    await api(`/api/recipe-blocks/${id}/duplicate`, { method: "POST" });
+    await refreshData();
+    toast("Bloco duplicado");
+  } catch (error) {
+    toast(error.message);
+  }
 }
 
 async function saveSheet(event) {
@@ -439,13 +548,17 @@ async function saveSheet(event) {
   const id = data.id;
   delete data.id;
   data.blocks = sheetBlocksPayload();
-  await api(id ? `/api/process-sheets/${id}` : "/api/process-sheets", {
-    method: id ? "PUT" : "POST",
-    body: JSON.stringify(data),
-  });
-  resetForm("sheetForm");
-  await refreshData();
-  toast("Folha salva");
+  try {
+    await api(id ? `/api/process-sheets/${id}` : "/api/process-sheets", {
+      method: id ? "PUT" : "POST",
+      body: JSON.stringify(data),
+    });
+    resetForm("sheetForm");
+    await refreshData();
+    toast("Folha salva");
+  } catch (error) {
+    toast(error.message);
+  }
 }
 
 function editEquipment(id) {
@@ -489,10 +602,14 @@ function editSheet(id) {
 }
 
 async function generateSheet(id) {
-  const generated = await api(`/api/process-sheets/${id}/generate`, { method: "POST" });
-  await refreshData();
-  toast("XLSX gerado");
-  window.location.href = `/download/${generated.id}`;
+  try {
+    const generated = await api(`/api/process-sheets/${id}/generate`, { method: "POST" });
+    await refreshData();
+    toast("XLSX gerado");
+    window.location.href = `/download/${generated.id}`;
+  } catch (error) {
+    toast(error.message);
+  }
 }
 
 bindEvents();

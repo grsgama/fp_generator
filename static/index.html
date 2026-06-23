@@ -116,6 +116,14 @@
             </div>
             <label>Supervisor <input name="supervisor" /></label>
             <label>Descricao <textarea name="description" rows="3"></textarea></label>
+            <label>Status
+              <select name="status">
+                <option value="draft">Rascunho</option>
+                <option value="review">Em revisao</option>
+                <option value="approved">Aprovada</option>
+                <option value="obsolete">Obsoleta</option>
+              </select>
+            </label>
 
             <div class="form-row-header">
               <h3>Sequencia de blocos</h3>
@@ -140,6 +148,18 @@
         <section class="panel">
           <h2>Arquivos gerados</h2>
           <div id="historyList" class="list"></div>
+        </section>
+        <section class="panel">
+          <h2>Auditoria</h2>
+          <div id="auditList" class="list"></div>
+        </section>
+        <section class="panel">
+          <h2>Revisoes de blocos</h2>
+          <div id="recipeRevisionList" class="list"></div>
+        </section>
+        <section class="panel">
+          <h2>Revisoes de folhas</h2>
+          <div id="sheetRevisionList" class="list"></div>
         </section>
       </section>
     </main>
