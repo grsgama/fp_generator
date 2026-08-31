@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>FP Generator</title>
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/styles.css?v=2" />
   </head>
   <body>
     <header class="app-header">
@@ -47,6 +47,12 @@
               </label>
             </div>
             <label>Observacoes <textarea name="notes" rows="3"></textarea></label>
+            <div class="form-row-header">
+              <h3>Anexos (Imagens, .TIF, .ZIP, .RAR, PDF)</h3>
+              <input type="file" id="equipmentFileInput" multiple accept="image/*,.tif,.tiff,.zip,.rar,.pdf" style="display:none;" />
+              <button type="button" class="secondary" onclick="document.getElementById('equipmentFileInput').click()">Anexar arquivo(s)</button>
+            </div>
+            <div id="equipmentAttachments" class="attachment-gallery"></div>
             <div class="actions">
               <button type="submit">Salvar</button>
               <button type="button" data-reset="equipmentForm">Limpar</button>
@@ -84,6 +90,13 @@
             </div>
             <label>Descricao <textarea name="description" rows="3"></textarea></label>
             <label>Notas <textarea name="notes" rows="3"></textarea></label>
+
+            <div class="form-row-header">
+              <h3>Anexos (Imagens, .TIF, .ZIP, .RAR, PDF)</h3>
+              <input type="file" id="recipeFileInput" multiple accept="image/*,.tif,.tiff,.zip,.rar,.pdf" style="display:none;" />
+              <button type="button" class="secondary" onclick="document.getElementById('recipeFileInput').click()">Anexar arquivo(s)</button>
+            </div>
+            <div id="recipeAttachments" class="attachment-gallery"></div>
 
             <div class="form-row-header">
               <h3>Parametros</h3>
@@ -164,7 +177,17 @@
       </section>
     </main>
 
+    <div id="viewSheetModal" class="modal-overlay">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="viewSheetTitle">Folha de Processo</h2>
+          <button type="button" class="secondary" id="closeViewSheetModal">✕ Fechar</button>
+        </div>
+        <div id="viewSheetBody" class="modal-body"></div>
+      </div>
+    </div>
+
     <div id="toast" class="toast" role="status"></div>
-    <script src="/app.js"></script>
+    <script src="/app.js?v=2"></script>
   </body>
 </html>

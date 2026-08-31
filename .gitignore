@@ -23,4 +23,6 @@ streamlit.log
 
 # App configurations / local outputs
 outputs/
+uploads/
 .streamlit/
+

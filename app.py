@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import uuid
 from datetime import date
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -15,8 +16,12 @@ from xlsx_writer import fill_sheet
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 OUTPUT_DIR = BASE_DIR / "outputs"
+UPLOAD_DIR = BASE_DIR / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 TEMPLATE_CANDIDATES = [
+    BASE_DIR / "FP_FolhaDeProcesso_Modelo_EmBranco.xlsx",
     BASE_DIR.parent / "FP_FolhaDeProcesso_Modelo_EmBranco.xlsx",
+    Path("/home/grsgama/Nextcloud2/LabNano/Folha de Processo/FP_FolhaDeProcesso_Modelo_EmBranco.xlsx"),
     Path("/home/grsgama/Nextcloud/LabNano/Folha de Processo/FP_FolhaDeProcesso_Modelo_EmBranco.xlsx"),
 ]
 DEFAULT_TEMPLATE = next((p for p in TEMPLATE_CANDIDATES if p.exists()), TEMPLATE_CANDIDATES[0])
@@ -248,6 +253,77 @@ def download_generated(generated_id: int) -> FileResponse:
     if not path.exists():
         raise HTTPException(status_code=404, detail="File is missing on disk")
     return FileResponse(path, filename=path.name)
+
+
+from PIL import Image
+
+
+@app.post("/api/attachments/{entity_type}/{entity_id}")
+async def upload_attachments(entity_type: str, entity_id: int, files: list[UploadFile] = File(...)):
+    if entity_type not in {"equipment", "recipe_block"}:
+        raise HTTPException(status_code=400, detail="entity_type invalido")
+    if entity_type == "equipment" and not db.get_equipment(entity_id):
+        raise HTTPException(status_code=404, detail="Equipamento nao encontrado")
+    if entity_type == "recipe_block" and not db.get_recipe_block(entity_id):
+        raise HTTPException(status_code=404, detail="Bloco de receita nao encontrado")
+
+    saved = []
+    for file in files:
+        if not file.filename:
+            continue
+        ext = Path(file.filename).suffix
+        stored_filename = f"{uuid.uuid4().hex}{ext}"
+        file_path = UPLOAD_DIR / stored_filename
+        contents = await file.read()
+        file_path.write_bytes(contents)
+        file_type = file.content_type or "application/octet-stream"
+        file_size = len(contents)
+
+        if ext.lower() in {".tif", ".tiff"}:
+            preview_path = UPLOAD_DIR / f"{stored_filename}.preview.png"
+            try:
+                with Image.open(file_path) as img:
+                    img.seek(0)
+                    img.convert("RGB").save(preview_path, format="PNG")
+            except Exception:
+                pass
+
+        record = db.add_attachment(entity_type, entity_id, file.filename, stored_filename, str(file_path), file_type, file_size)
+        saved.append(record)
+    return saved
+
+
+@app.get("/api/attachments/{entity_type}/{entity_id}")
+def list_attachments(entity_type: str, entity_id: int) -> list[dict[str, Any]]:
+    return db.list_attachments(entity_type, entity_id)
+
+
+@app.delete("/api/attachments/{attachment_id}")
+def delete_attachment(attachment_id: int):
+    att = db.delete_attachment(attachment_id)
+    if not att:
+        raise HTTPException(status_code=404, detail="Anexo nao encontrado")
+    path = Path(att["file_path"])
+    if path.exists():
+        try:
+            path.unlink()
+        except Exception:
+            pass
+    preview_path = UPLOAD_DIR / f"{att['stored_filename']}.preview.png"
+    if preview_path.exists():
+        try:
+            preview_path.unlink()
+        except Exception:
+            pass
+    return {"status": "ok", "deleted_id": attachment_id}
+
+
+@app.get("/uploads/{filename}")
+def serve_upload(filename: str) -> FileResponse:
+    path = UPLOAD_DIR / filename
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Arquivo nao encontrado")
+    return FileResponse(path)
 
 
 if STATIC_DIR.exists():

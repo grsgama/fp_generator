@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="/home/grsgama/Repositorio/fp_generator"
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_BIN="$APP_DIR/.venv/bin/python"
 PORT="${1:-8511}"
 HOST="${2:-0.0.0.0}"

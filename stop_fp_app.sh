@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="/home/grsgama/Repositorio/fp_generator"
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PID_FILE="$APP_DIR/fp_generator.pid"
 UNIT_NAME="fp_generator"
 

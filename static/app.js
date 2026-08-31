@@ -87,15 +87,53 @@ function resetForm(formId) {
   const form = $(`#${formId}`);
   form.reset();
   $("input[name='id']", form).value = "";
+  if (formId === "equipmentForm") {
+    const attDiv = $("#equipmentAttachments");
+    if (attDiv) attDiv.innerHTML = "";
+    const fileIn = $("#equipmentFileInput");
+    if (fileIn) fileIn.value = "";
+  }
   if (formId === "recipeForm") {
     $("#recipeParams").innerHTML = "";
     addRecipeParamRow();
+    const attDiv = $("#recipeAttachments");
+    if (attDiv) attDiv.innerHTML = "";
+    const fileIn = $("#recipeFileInput");
+    if (fileIn) fileIn.value = "";
   }
   if (formId === "sheetForm") {
     $("#sheetBlocks").innerHTML = "";
     addSheetBlockRow();
     updateSheetBlockOrder();
   }
+}
+
+function renderAttachmentGallery(attachments = [], canDelete = true) {
+  if (!attachments || !attachments.length) return "";
+  return `
+    <div class="attachment-gallery">
+      ${attachments
+        .map((att) => {
+          const isTiff = /\.(tiff?)$/i.test(att.filename);
+          const isImg = att.file_type.startsWith("image/") || /\.(png|jpe?g|gif|webp|tiff?)$/i.test(att.filename);
+          const url = `/uploads/${att.stored_filename}`;
+          const imgUrl = isTiff ? `${url}.preview.png` : url;
+          const ext = att.filename.split(".").pop().toUpperCase();
+          return `
+            <div class="attachment-card" title="${att.filename}">
+              ${canDelete ? `<button type="button" class="btn-del-att" data-delete-attachment="${att.id}">✕</button>` : ""}
+              ${
+                isImg
+                  ? `<a href="${url}" target="_blank"><img src="${imgUrl}" alt="${att.filename}" onerror="this.onerror=null;this.src='${url}';" /></a>`
+                  : `<a href="${url}" target="_blank" class="file-badge">${ext}</a>`
+              }
+              <a href="${url}" target="_blank" class="file-name">${att.filename}</a>
+            </div>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
 }
 
 function renderEquipment() {
@@ -126,6 +164,7 @@ function renderEquipment() {
         </div>
       </div>
       ${item.notes ? `<p>${item.notes}</p>` : ""}
+      ${renderAttachmentGallery(item.attachments, true)}
     `;
     list.append(node);
   });
@@ -164,6 +203,7 @@ function renderRecipes() {
       </div>
       ${item.description ? `<p>${item.description}</p>` : ""}
       ${params ? `<p class="muted">${params}</p>` : ""}
+      ${renderAttachmentGallery(item.attachments, true)}
     `;
     list.append(node);
   });
@@ -191,6 +231,7 @@ function renderSheets() {
           </div>
         </div>
         <div class="item-actions">
+          <button class="secondary" data-view-sheet="${item.id}">👁️ Visualizar</button>
           <button class="secondary" data-edit-sheet="${item.id}">Editar</button>
           <button data-generate-sheet="${item.id}">Gerar XLSX</button>
           <button class="danger" data-delete-sheet="${item.id}">Remover</button>
@@ -201,6 +242,86 @@ function renderSheets() {
     `;
     list.append(node);
   });
+}
+
+function viewSheet(id) {
+  const item = state.sheets.find((entry) => entry.id === id);
+  if (!item) return;
+  $("#viewSheetTitle").textContent = `📄 ${item.title}`;
+  const body = $("#viewSheetBody");
+
+  let html = `
+    <div class="panel">
+      <div class="tags">
+        <span class="tag">Status: ${item.status}</span>
+        ${item.author ? `<span class="tag">Autor: ${item.author}</span>` : ""}
+        ${item.project_name ? `<span class="tag">Projeto: ${item.project_name}</span>` : ""}
+        ${item.supervisor ? `<span class="tag">Supervisor: ${item.supervisor}</span>` : ""}
+      </div>
+      ${item.description ? `<p style="margin-top:10px;margin-bottom:0;"><strong>Descrição:</strong> ${item.description}</p>` : ""}
+    </div>
+    <h3 style="margin-top:10px; margin-bottom:4px;">Sequência de Processo (${item.blocks.length} Etapas)</h3>
+  `;
+
+  item.blocks.forEach((block, idx) => {
+    const recipe = state.recipes.find((r) => r.id === block.recipe_block_id) || {};
+    const title = block.title_override || block.recipe_name || recipe.name || `Etapa ${idx + 1}`;
+    const params = recipe.parameters || block.parameters || [];
+    const attachments = recipe.attachments || block.attachments || [];
+
+    html += `
+      <article class="view-step-card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <h4 style="margin:0; font-size:16px;">
+              <span class="view-step-num">Passo ${idx + 1}:</span> ${title}
+            </h4>
+            <div class="tags" style="margin-top:6px;">
+              <span class="tag">${recipe.category || block.category || "-"}</span>
+              <span class="tag">${recipe.subtype || block.subtype || "-"}</span>
+              <span class="tag">Equipamento: ${block.equipment_name || recipe.equipment_name || "-"}</span>
+            </div>
+          </div>
+        </div>
+        ${recipe.description ? `<p style="margin-top:10px; margin-bottom:8px; font-style:italic; color:#475467;">${recipe.description}</p>` : ""}
+        
+        ${
+          params.length
+            ? `
+            <table class="view-param-table">
+              <thead>
+                <tr>
+                  <th>Parâmetro</th>
+                  <th>Valor</th>
+                  <th>Unidade</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${params
+                  .map(
+                    (p) => `
+                  <tr>
+                    <td><strong>${p.name}</strong></td>
+                    <td>${p.value || "---"}</td>
+                    <td>${p.unit || "---"}</td>
+                  </tr>
+                `
+                  )
+                  .join("")}
+              </tbody>
+            </table>
+          `
+            : `<p class="muted" style="margin-top:8px; margin-bottom:8px;">Sem parâmetros numéricos definidos.</p>`
+        }
+        
+        ${renderAttachmentGallery(attachments, false)}
+        ${block.notes_override || recipe.notes ? `<p style="margin-top:8px; margin-bottom:0; font-size:12px; color:#64748b;"><strong>Notas:</strong> ${block.notes_override || recipe.notes}</p>` : ""}
+      </article>
+    `;
+  });
+
+  body.innerHTML = html;
+  $("#viewSheetModal").classList.add("active");
 }
 
 function renderHistory() {
@@ -456,6 +577,18 @@ function bindEvents() {
       target.closest(".param-row, .sheet-block-row").remove();
       updateSheetBlockOrder();
     }
+    if (target.closest("[data-delete-attachment]")) {
+      const btn = target.closest("[data-delete-attachment]");
+      const attId = btn.dataset.deleteAttachment;
+      try {
+        await api(`/api/attachments/${attId}`, { method: "DELETE" });
+        await refreshData();
+        toast("Anexo removido");
+      } catch (err) {
+        toast(err.message);
+      }
+    }
+    if (target.matches("[data-view-sheet]")) viewSheet(Number(target.dataset.viewSheet));
     if (target.matches("[data-edit-equipment]")) editEquipment(Number(target.dataset.editEquipment));
     if (target.matches("[data-edit-recipe]")) editRecipe(Number(target.dataset.editRecipe));
     if (target.matches("[data-edit-sheet]")) editSheet(Number(target.dataset.editSheet));
@@ -465,6 +598,17 @@ function bindEvents() {
     if (target.matches("[data-delete-sheet]")) await removeItem(`/api/process-sheets/${target.dataset.deleteSheet}`);
     if (target.matches("[data-generate-sheet]")) await generateSheet(Number(target.dataset.generateSheet));
   });
+
+  const modalCloseBtn = $("#closeViewSheetModal");
+  if (modalCloseBtn) {
+    modalCloseBtn.addEventListener("click", () => $("#viewSheetModal").classList.remove("active"));
+  }
+  const modalOverlay = $("#viewSheetModal");
+  if (modalOverlay) {
+    modalOverlay.addEventListener("click", (e) => {
+      if (e.target === modalOverlay) modalOverlay.classList.remove("active");
+    });
+  }
 
   $("#equipmentForm").addEventListener("submit", saveEquipment);
   $("#recipeForm").addEventListener("submit", saveRecipe);
@@ -500,10 +644,18 @@ async function saveEquipment(event) {
   const id = data.id;
   delete data.id;
   try {
-    await api(id ? `/api/equipment/${id}` : "/api/equipment", {
+    const saved = await api(id ? `/api/equipment/${id}` : "/api/equipment", {
       method: id ? "PUT" : "POST",
       body: JSON.stringify(data),
     });
+    const eqId = saved.id;
+    const fileInput = $("#equipmentFileInput");
+    if (fileInput && fileInput.files.length) {
+      const fd = new FormData();
+      for (const f of fileInput.files) fd.append("files", f);
+      await fetch(`/api/attachments/equipment/${eqId}`, { method: "POST", body: fd });
+      fileInput.value = "";
+    }
     resetForm("equipmentForm");
     await refreshData();
     toast("Equipamento salvo");
@@ -520,10 +672,18 @@ async function saveRecipe(event) {
   data.equipment_id = Number(data.equipment_id);
   data.parameters = recipeParamsPayload();
   try {
-    await api(id ? `/api/recipe-blocks/${id}` : "/api/recipe-blocks", {
+    const saved = await api(id ? `/api/recipe-blocks/${id}` : "/api/recipe-blocks", {
       method: id ? "PUT" : "POST",
       body: JSON.stringify(data),
     });
+    const recipeId = saved.id;
+    const fileInput = $("#recipeFileInput");
+    if (fileInput && fileInput.files.length) {
+      const fd = new FormData();
+      for (const f of fileInput.files) fd.append("files", f);
+      await fetch(`/api/attachments/recipe_block/${recipeId}`, { method: "POST", body: fd });
+      fileInput.value = "";
+    }
     resetForm("recipeForm");
     await refreshData();
     toast("Bloco salvo");
@@ -569,6 +729,8 @@ function editEquipment(id) {
     if (input) input.value = value || "";
   });
   fillSubtypeSelect(form, item.category, item.subtype);
+  const attDiv = $("#equipmentAttachments");
+  if (attDiv) attDiv.innerHTML = renderAttachmentGallery(item.attachments, true);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -584,6 +746,8 @@ function editRecipe(id) {
   $("#recipeParams").innerHTML = "";
   item.parameters.forEach((param) => addRecipeParamRow(param));
   if (!item.parameters.length) addRecipeParamRow();
+  const attDiv = $("#recipeAttachments");
+  if (attDiv) attDiv.innerHTML = renderAttachmentGallery(item.attachments, true);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 

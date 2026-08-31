@@ -8,11 +8,11 @@ from typing import Any
 DB_PATH = Path(__file__).resolve().parent / "fp_data.db"
 
 PROCESS_CATEGORIES = {
-    "Litografia": ["Optica", "Feixe de eletrons"],
+    "Litografia": ["Optica", "Feixe de eletrons", "Spin Coating"],
     "Deposicao": ["Sputtering", "Evaporacao"],
     "Ataque": ["Umido", "RIE", "DRIE", "Ion Milling"],
     "Inspecao": ["MEV", "TEM", "Microscopio optico", "Probe Station"],
-    "Preparacao": ["FIB", "Wire Bonder"],
+    "Preparacao": ["FIB", "Wire Bonder", "Spin Coater", "Limpeza / Bake"],
 }
 
 EQUIPMENT_STATUSES = {"active", "inactive"}
@@ -136,8 +136,21 @@ def init_db() -> None:
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS attachment (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entity_type TEXT NOT NULL,
+                entity_id INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                stored_filename TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                file_type TEXT NOT NULL,
+                file_size INTEGER NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE INDEX IF NOT EXISTS idx_recipe_block_category ON recipe_block(category, subtype);
             CREATE INDEX IF NOT EXISTS idx_sheet_block_sheet ON process_sheet_block(process_sheet_id, seq);
+            CREATE INDEX IF NOT EXISTS idx_attachment_entity ON attachment(entity_type, entity_id);
             """
         )
         _migrate_equipment_columns(conn)
@@ -262,6 +275,49 @@ def list_process_sheet_revisions(process_sheet_id: int) -> list[dict[str, Any]]:
     return _rows_to_dicts(rows)
 
 
+def add_attachment(entity_type: str, entity_id: int, filename: str, stored_filename: str, file_path: str, file_type: str, file_size: int) -> dict[str, Any]:
+    with get_conn() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO attachment(entity_type, entity_id, filename, stored_filename, file_path, file_type, file_size)
+            VALUES(?, ?, ?, ?, ?, ?, ?)
+            """,
+            (entity_type, entity_id, filename, stored_filename, file_path, file_type, file_size),
+        )
+        att_id = cur.lastrowid
+        row = conn.execute("SELECT * FROM attachment WHERE id = ?", (att_id,)).fetchone()
+        return _row_to_dict(row) or {}
+
+
+def list_attachments(entity_type: str, entity_id: int) -> list[dict[str, Any]]:
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, entity_type, entity_id, filename, stored_filename, file_path, file_type, file_size, created_at
+            FROM attachment
+            WHERE entity_type = ? AND entity_id = ?
+            ORDER BY id ASC
+            """,
+            (entity_type, entity_id),
+        ).fetchall()
+        return _rows_to_dicts(rows)
+
+
+def get_attachment(attachment_id: int) -> dict[str, Any] | None:
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM attachment WHERE id = ?", (attachment_id,)).fetchone()
+        return _row_to_dict(row)
+
+
+def delete_attachment(attachment_id: int) -> dict[str, Any] | None:
+    att = get_attachment(attachment_id)
+    if not att:
+        return None
+    with get_conn() as conn:
+        conn.execute("DELETE FROM attachment WHERE id = ?", (attachment_id,))
+    return att
+
+
 def list_equipment(include_inactive: bool = False) -> list[dict[str, Any]]:
     where = "" if include_inactive else "WHERE status = 'active'"
     with get_conn() as conn:
@@ -273,7 +329,10 @@ def list_equipment(include_inactive: bool = False) -> list[dict[str, Any]]:
             ORDER BY category, subtype, name, id
             """
         ).fetchall()
-    return _rows_to_dicts(rows)
+    items = _rows_to_dicts(rows)
+    for item in items:
+        item["attachments"] = list_attachments("equipment", item["id"])
+    return items
 
 
 def get_equipment(equipment_id: int) -> dict[str, Any] | None:
@@ -286,7 +345,10 @@ def get_equipment(equipment_id: int) -> dict[str, Any] | None:
             """,
             (equipment_id,),
         ).fetchone()
-    return _row_to_dict(row)
+    item = _row_to_dict(row)
+    if item:
+        item["attachments"] = list_attachments("equipment", item["id"])
+    return item
 
 
 def create_equipment(data: dict[str, Any]) -> dict[str, Any]:
@@ -369,6 +431,7 @@ def list_recipe_blocks() -> list[dict[str, Any]]:
     blocks = _rows_to_dicts(rows)
     for block in blocks:
         block["parameters"] = list_recipe_parameters(block["id"])
+        block["attachments"] = list_attachments("recipe_block", block["id"])
     return blocks
 
 
@@ -388,6 +451,7 @@ def get_recipe_block(recipe_block_id: int) -> dict[str, Any] | None:
     block = _row_to_dict(row)
     if block:
         block["parameters"] = list_recipe_parameters(recipe_block_id)
+        block["attachments"] = list_attachments("recipe_block", recipe_block_id)
     return block
 
 
