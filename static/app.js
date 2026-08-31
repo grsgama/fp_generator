@@ -124,10 +124,10 @@ function renderAttachmentGallery(attachments = [], canDelete = true) {
               ${canDelete ? `<button type="button" class="btn-del-att" data-delete-attachment="${att.id}">✕</button>` : ""}
               ${
                 isImg
-                  ? `<a href="${url}" target="_blank"><img src="${imgUrl}" alt="${att.filename}" onerror="this.onerror=null;this.src='${url}';" /></a>`
+                  ? `<a href="${imgUrl}" target="_blank"><img src="${imgUrl}" alt="${att.filename}" onerror="this.onerror=null;this.src='${url}';" /></a>`
                   : `<a href="${url}" target="_blank" class="file-badge">${ext}</a>`
               }
-              <a href="${url}" target="_blank" class="file-name">${att.filename}</a>
+              <a href="${url}" download="${att.filename}" class="file-name" title="Baixar arquivo original (${att.filename})">${att.filename}</a>
             </div>
           `;
         })
