@@ -318,6 +318,34 @@ def delete_attachment(attachment_id: int):
     return {"status": "ok", "deleted_id": attachment_id}
 
 
+class LabStepIn(BaseModel):
+    checked: int | None = None
+    comments: str | None = None
+
+
+class LabGeneralIn(BaseModel):
+    general_comments: str
+
+
+@app.get("/api/lab-mode/{process_sheet_id}")
+def get_lab_mode(process_sheet_id: int) -> dict[str, Any]:
+    sheet = db.get_process_sheet(process_sheet_id)
+    if not sheet:
+        raise HTTPException(status_code=404, detail="Process sheet not found")
+    lab_exec = db.get_or_create_lab_execution(process_sheet_id)
+    return {"sheet": sheet, "lab_execution": lab_exec}
+
+
+@app.put("/api/lab-mode/{process_sheet_id}/step/{process_sheet_block_id}")
+def update_lab_step(process_sheet_id: int, process_sheet_block_id: int, payload: LabStepIn) -> dict[str, Any]:
+    return db.update_lab_step_execution(process_sheet_id, process_sheet_block_id, payload.checked, payload.comments)
+
+
+@app.put("/api/lab-mode/{process_sheet_id}/general-comments")
+def update_lab_general_comments(process_sheet_id: int, payload: LabGeneralIn) -> dict[str, Any]:
+    return db.update_lab_general_comments(process_sheet_id, payload.general_comments)
+
+
 @app.get("/uploads/{filename}")
 def serve_upload(filename: str) -> FileResponse:
     path = UPLOAD_DIR / filename

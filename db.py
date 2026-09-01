@@ -148,9 +148,31 @@ def init_db() -> None:
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS lab_execution (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                process_sheet_id INTEGER NOT NULL UNIQUE,
+                operator TEXT,
+                general_comments TEXT,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(process_sheet_id) REFERENCES process_sheet(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS lab_execution_step (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                lab_execution_id INTEGER NOT NULL,
+                process_sheet_block_id INTEGER NOT NULL,
+                checked INTEGER NOT NULL DEFAULT 0,
+                comments TEXT,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(lab_execution_id) REFERENCES lab_execution(id) ON DELETE CASCADE,
+                FOREIGN KEY(process_sheet_block_id) REFERENCES process_sheet_block(id) ON DELETE CASCADE,
+                UNIQUE(lab_execution_id, process_sheet_block_id)
+            );
+
             CREATE INDEX IF NOT EXISTS idx_recipe_block_category ON recipe_block(category, subtype);
             CREATE INDEX IF NOT EXISTS idx_sheet_block_sheet ON process_sheet_block(process_sheet_id, seq);
             CREATE INDEX IF NOT EXISTS idx_attachment_entity ON attachment(entity_type, entity_id);
+            CREATE INDEX IF NOT EXISTS idx_lab_exec_sheet ON lab_execution(process_sheet_id);
             """
         )
         _migrate_equipment_columns(conn)
@@ -903,3 +925,64 @@ def sheet_to_xlsx_payload(sheet: dict[str, Any]) -> dict[str, Any]:
 
 def export_json(data: Any) -> str:
     return json.dumps(data, ensure_ascii=False, indent=2)
+
+
+def get_or_create_lab_execution(process_sheet_id: int) -> dict[str, Any]:
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM lab_execution WHERE process_sheet_id = ?", (process_sheet_id,)).fetchone()
+        if not row:
+            conn.execute("INSERT INTO lab_execution(process_sheet_id) VALUES(?)", (process_sheet_id,))
+            row = conn.execute("SELECT * FROM lab_execution WHERE process_sheet_id = ?", (process_sheet_id,)).fetchone()
+
+        lab_exec = _row_to_dict(row) or {}
+        lab_exec_id = lab_exec["id"]
+
+        step_rows = conn.execute(
+            "SELECT * FROM lab_execution_step WHERE lab_execution_id = ?", (lab_exec_id,)
+        ).fetchall()
+        step_map = {r["process_sheet_block_id"]: _row_to_dict(r) for r in step_rows}
+        lab_exec["steps"] = step_map
+        return lab_exec
+
+
+def update_lab_step_execution(process_sheet_id: int, process_sheet_block_id: int, checked: int | None = None, comments: str | None = None) -> dict[str, Any]:
+    lab_exec = get_or_create_lab_execution(process_sheet_id)
+    lab_exec_id = lab_exec["id"]
+    with get_conn() as conn:
+        existing = conn.execute(
+            "SELECT * FROM lab_execution_step WHERE lab_execution_id = ? AND process_sheet_block_id = ?",
+            (lab_exec_id, process_sheet_block_id),
+        ).fetchone()
+
+        if existing:
+            new_checked = checked if checked is not None else existing["checked"]
+            new_comments = comments if comments is not None else (existing["comments"] or "")
+            conn.execute(
+                """
+                UPDATE lab_execution_step
+                SET checked = ?, comments = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (new_checked, new_comments, existing["id"]),
+            )
+        else:
+            new_checked = checked if checked is not None else 0
+            new_comments = comments if comments is not None else ""
+            conn.execute(
+                """
+                INSERT INTO lab_execution_step(lab_execution_id, process_sheet_block_id, checked, comments)
+                VALUES(?, ?, ?, ?)
+                """,
+                (lab_exec_id, process_sheet_block_id, new_checked, new_comments),
+            )
+    return get_or_create_lab_execution(process_sheet_id)
+
+
+def update_lab_general_comments(process_sheet_id: int, general_comments: str) -> dict[str, Any]:
+    lab_exec = get_or_create_lab_execution(process_sheet_id)
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE lab_execution SET general_comments = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (general_comments, lab_exec["id"]),
+        )
+    return get_or_create_lab_execution(process_sheet_id)

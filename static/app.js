@@ -231,6 +231,7 @@ function renderSheets() {
           </div>
         </div>
         <div class="item-actions">
+          <button class="secondary" data-lab-mode="${item.id}">🧪 Modo Lab</button>
           <button class="secondary" data-view-sheet="${item.id}">👁️ Visualizar</button>
           <button class="secondary" data-edit-sheet="${item.id}">Editar</button>
           <button data-generate-sheet="${item.id}">Gerar XLSX</button>
@@ -322,6 +323,204 @@ function viewSheet(id) {
 
   body.innerHTML = html;
   $("#viewSheetModal").classList.add("active");
+}
+
+let currentLabState = { sheetId: null, debouncers: {} };
+
+async function openLabMode(sheetId) {
+  try {
+    const data = await api(`/api/lab-mode/${sheetId}`);
+    const sheet = data.sheet;
+    const labExec = data.lab_execution;
+    const stepStates = labExec.steps || {};
+
+    currentLabState.sheetId = sheetId;
+
+    $("#labModeTitle").textContent = `🧪 Modo Lab - ${sheet.title}`;
+    const body = $("#labModeBody");
+
+    const totalSteps = sheet.blocks.length;
+    const completedSteps = sheet.blocks.filter((b) => (stepStates[b.id] ? stepStates[b.id].checked : 0)).length;
+    const pct = totalSteps ? Math.round((completedSteps / totalSteps) * 100) : 0;
+
+    let html = `
+      <div class="panel">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h3 style="margin:0;">Progresso da Execução</h3>
+          <span id="labProgressText" style="font-weight:bold; color:var(--accent);">${completedSteps} de ${totalSteps} etapas concluídas (${pct}%)</span>
+        </div>
+        <div class="lab-progress-bar-bg">
+          <div id="labProgressBarFill" class="lab-progress-bar-fill" style="width: ${pct}%;"></div>
+        </div>
+        <div style="margin-top:14px;">
+          <label style="margin-bottom:4px;">
+            💬 Comentários Gerais / Lote de Execução
+            <span id="saveIndicatorGeneral" class="save-indicator">Auto-salvo no banco ✓</span>
+          </label>
+          <textarea id="labGeneralComments" rows="2" placeholder="Digite observações gerais sobre a rodada, lote de substratos, lote de químicos...">${labExec.general_comments || ""}</textarea>
+        </div>
+      </div>
+      <h3 style="margin-top:10px; margin-bottom:4px;">Checklist de Etapas</h3>
+    `;
+
+    sheet.blocks.forEach((block, idx) => {
+      const recipe = state.recipes.find((r) => r.id === block.recipe_block_id) || {};
+      const title = block.title_override || block.recipe_name || recipe.name || `Etapa ${idx + 1}`;
+      const params = recipe.parameters || block.parameters || [];
+      const attachments = recipe.attachments || block.attachments || [];
+      const stepState = stepStates[block.id] || { checked: 0, comments: "" };
+      const isChecked = Boolean(stepState.checked);
+
+      html += `
+        <article class="lab-step-card ${isChecked ? "checked" : ""}" data-lab-card-block="${block.id}">
+          <button type="button" class="lab-check-btn" data-toggle-lab-step="${block.id}">
+            ${isChecked ? "✓ ETAPA CONCLUÍDA" : "☐ MARCAR ETAPA COMO CONCLUÍDA"}
+          </button>
+
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+              <h4 style="margin:0; font-size:16px;">
+                <span class="view-step-num">Etapa ${idx + 1}:</span> ${title}
+              </h4>
+              <div class="tags" style="margin-top:6px;">
+                <span class="tag">${recipe.category || block.category || "-"}</span>
+                <span class="tag">${recipe.subtype || block.subtype || "-"}</span>
+                <span class="tag">Equipamento: ${block.equipment_name || recipe.equipment_name || "-"}</span>
+              </div>
+            </div>
+          </div>
+
+          ${recipe.description ? `<p style="margin-top:10px; margin-bottom:8px; font-style:italic; color:#475467;">${recipe.description}</p>` : ""}
+
+          ${
+            params.length
+              ? `
+              <table class="view-param-table">
+                <thead>
+                  <tr>
+                    <th>Parâmetro</th>
+                    <th>Valor</th>
+                    <th>Unidade</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${params
+                    .map(
+                      (p) => `
+                    <tr>
+                      <td><strong>${p.name}</strong></td>
+                      <td>${p.value || "---"}</td>
+                      <td>${p.unit || "---"}</td>
+                    </tr>
+                  `
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+            `
+              : ""
+          }
+
+          ${renderAttachmentGallery(attachments, false)}
+
+          <div style="margin-top:12px;">
+            <label style="font-size:12px; margin-bottom:4px;">
+              💬 Comentários / Ocorrências desta Etapa
+              <span id="saveIndicatorStep_${block.id}" class="save-indicator">Auto-salvo ✓</span>
+            </label>
+            <textarea data-lab-step-comments="${block.id}" rows="2" placeholder="Registre dados específicos desta etapa (ex: tempo exato, observações de qualidade)...">${stepState.comments || ""}</textarea>
+          </div>
+        </article>
+      `;
+    });
+
+    body.innerHTML = html;
+    bindLabModeEvents(sheetId, sheet.blocks);
+    $("#labModeModal").classList.add("active");
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+function bindLabModeEvents(sheetId, blocks) {
+  const genComments = $("#labGeneralComments");
+  if (genComments) {
+    genComments.addEventListener("input", () => {
+      const ind = $("#saveIndicatorGeneral");
+      if (ind) {
+        ind.textContent = "Salvando...";
+        ind.classList.remove("saved");
+      }
+      clearTimeout(currentLabState.debouncers["general"]);
+      currentLabState.debouncers["general"] = setTimeout(async () => {
+        try {
+          await api(`/api/lab-mode/${sheetId}/general-comments`, {
+            method: "PUT",
+            body: JSON.stringify({ general_comments: genComments.value }),
+          });
+          if (ind) {
+            ind.textContent = "Gravado no banco ✓";
+            ind.classList.add("saved");
+          }
+        } catch (e) {
+          if (ind) ind.textContent = "Erro ao salvar";
+        }
+      }, 500);
+    });
+  }
+
+  $$("[data-lab-step-comments]").forEach((textarea) => {
+    const blockId = Number(textarea.dataset.labStepComments);
+    textarea.addEventListener("input", () => {
+      const ind = $(`#saveIndicatorStep_${blockId}`);
+      if (ind) {
+        ind.textContent = "Salvando...";
+        ind.classList.remove("saved");
+      }
+      clearTimeout(currentLabState.debouncers[`step_${blockId}`]);
+      currentLabState.debouncers[`step_${blockId}`] = setTimeout(async () => {
+        try {
+          await api(`/api/lab-mode/${sheetId}/step/${blockId}`, {
+            method: "PUT",
+            body: JSON.stringify({ comments: textarea.value }),
+          });
+          if (ind) {
+            ind.textContent = "Auto-salvo no banco ✓";
+            ind.classList.add("saved");
+          }
+        } catch (e) {
+          if (ind) ind.textContent = "Erro ao salvar";
+        }
+      }, 500);
+    });
+  });
+
+  $$("[data-toggle-lab-step]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const blockId = Number(btn.dataset.toggleLabStep);
+      const card = $(`[data-lab-card-block='${blockId}']`);
+      const isCurrentlyChecked = card.classList.contains("checked");
+      const newChecked = isCurrentlyChecked ? 0 : 1;
+
+      card.classList.toggle("checked", Boolean(newChecked));
+      btn.textContent = newChecked ? "✓ ETAPA CONCLUÍDA" : "☐ MARCAR ETAPA COMO CONCLUÍDA";
+
+      const totalSteps = blocks.length;
+      const completedSteps = $$(".lab-step-card.checked").length;
+      const pct = totalSteps ? Math.round((completedSteps / totalSteps) * 100) : 0;
+      $("#labProgressText").textContent = `${completedSteps} de ${totalSteps} etapas concluídas (${pct}%)`;
+      $("#labProgressBarFill").style.width = `${pct}%`;
+
+      try {
+        await api(`/api/lab-mode/${sheetId}/step/${blockId}`, {
+          method: "PUT",
+          body: JSON.stringify({ checked: newChecked }),
+        });
+      } catch (e) {
+        toast("Erro ao salvar status da etapa");
+      }
+    });
+  });
 }
 
 function renderHistory() {
@@ -588,6 +787,7 @@ function bindEvents() {
         toast(err.message);
       }
     }
+    if (target.matches("[data-lab-mode]")) openLabMode(Number(target.dataset.labMode));
     if (target.matches("[data-view-sheet]")) viewSheet(Number(target.dataset.viewSheet));
     if (target.matches("[data-edit-equipment]")) editEquipment(Number(target.dataset.editEquipment));
     if (target.matches("[data-edit-recipe]")) editRecipe(Number(target.dataset.editRecipe));
@@ -607,6 +807,17 @@ function bindEvents() {
   if (modalOverlay) {
     modalOverlay.addEventListener("click", (e) => {
       if (e.target === modalOverlay) modalOverlay.classList.remove("active");
+    });
+  }
+
+  const labCloseBtn = $("#closeLabModeModal");
+  if (labCloseBtn) {
+    labCloseBtn.addEventListener("click", () => $("#labModeModal").classList.remove("active"));
+  }
+  const labOverlay = $("#labModeModal");
+  if (labOverlay) {
+    labOverlay.addEventListener("click", (e) => {
+      if (e.target === labOverlay) labOverlay.classList.remove("active");
     });
   }
 
